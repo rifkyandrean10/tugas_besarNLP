@@ -1,0 +1,83 @@
+# Import library yang dibutuhkan
+import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report
+from google.colab import files
+
+# Langkah 1: Upload file CSV
+uploaded = files.upload()
+
+# Mengambil nama file yang diunggah
+dataset_path = list(uploaded.keys())[0]
+data = pd.read_csv(dataset_path)
+
+# Langkah 2: Memeriksa kolom yang tersedia
+print("Kolom yang tersedia dalam dataset:", data.columns)
+
+# Pastikan kolom 'cleaned_review' ada
+if 'cleaned_review' not in data.columns:
+    raise ValueError("Kolom 'cleaned_review' tidak ditemukan dalam dataset.")
+
+# Langkah 3: Menangani data NaN pada kolom 'cleaned_review'
+data['cleaned_review'] = data['cleaned_review'].fillna('')
+
+# Langkah 4: Membuat label sentimen berbasis kata kunci
+# Definisikan kata-kata positif dan negatif
+positive_words = ['good', 'great', 'excellent', 'love', 'amazing', 'awesome', 'best', 'fantastic', 'wonderful']
+negative_words = ['bad', 'poor', 'terrible', 'awful', 'hate', 'worst', 'disappointing', 'horrible', 'negative']
+
+def detect_sentiment(text):
+    text = text.lower()
+    if any(word in text for word in positive_words):
+        return 1  # Positif
+    elif any(word in text for word in negative_words):
+        return 0  # Negatif
+    else:
+        return 0  # Default negatif jika tidak ada indikasi
+
+# Terapkan fungsi deteksi sentimen
+data['sentiment'] = data['cleaned_review'].apply(detect_sentiment)
+
+# Menampilkan distribusi label sentimen
+print("Distribusi sentimen:\n", data['sentiment'].value_counts())
+
+# Langkah 5: Menerapkan teknik TF-IDF
+print("Menerapkan TF-IDF pada cleaned_review...")
+tfidf_vectorizer = TfidfVectorizer()
+tfidf_matrix = tfidf_vectorizer.fit_transform(data['cleaned_review'])
+
+# Langkah 6: Memisahkan data latih dan uji
+X_train, X_test, y_train, y_test = train_test_split(tfidf_matrix, data['sentiment'], test_size=0.2, random_state=42)
+
+# Langkah 7: Melatih model Logistic Regression
+print("Melatih model Logistic Regression...")
+model = LogisticRegression()
+model.fit(X_train, y_train)
+
+# Langkah 8: Melakukan prediksi
+print("Melakukan prediksi pada data uji...")
+y_pred = model.predict(X_test)
+
+# Langkah 9: Menghitung metrik evaluasi
+accuracy = accuracy_score(y_test, y_pred)
+precision = precision_score(y_test, y_pred, average='weighted')
+recall = recall_score(y_test, y_pred, average='weighted')
+f1 = f1_score(y_test, y_pred, average='weighted')
+
+# Menampilkan hasil evaluasi
+print("Akurasi:", accuracy)
+print("Precision:", precision)
+print("Recall:", recall)
+print("F1-Score:", f1)
+print("\nLaporan Klasifikasi:\n", classification_report(y_test, y_pred))
+
+# Langkah 10: Menampilkan hasil prediksi pada beberapa data uji
+print("\nContoh hasil prediksi:")
+result_df = pd.DataFrame({
+    'cleaned_review': data.iloc[y_test.index]['cleaned_review'],
+    'actual_sentiment': y_test.replace({0: 'Negatif', 1: 'Positif'}),
+    'predicted_sentiment': pd.Series(y_pred, index=y_test.index).replace({0: 'Negatif', 1: 'Positif'})
+})
+print(result_df.head())
